@@ -24,4 +24,13 @@ def save_with_sha(source: pathlib.Path, dest: pathlib.Path) -> Tuple[pathlib.Pat
                 sha256.update(chunk)
                 fp_dst.write(chunk)
     digest = sha256.hexdigest()
-    return dest, digest 
+    return dest, digest
+
+
+def calc_sha256(path: pathlib.Path) -> str:
+    """Calculate SHA-256 of existing file."""
+    sha256 = hashlib.sha256()
+    with path.open("rb") as fp:
+        for chunk in iter(lambda: fp.read(BUFFER_SIZE), b""):
+            sha256.update(chunk)
+    return sha256.hexdigest() 

@@ -4,10 +4,13 @@ import logging
 import os
 import uuid
 from datetime import date, timedelta
+import pathlib
 
 from dotenv import load_dotenv
 
 from src.downloader import edinet, tdnet
+from src.downloader.storage import calc_sha256
+from src import db as db_module
 
 load_dotenv()
 
@@ -33,9 +36,45 @@ def run_since(since: date, days: int = 1) -> None:
         edinet_results = edinet.download(day)
         AuditLogger.log("INFO", "downloader.tdnet", "download", {"date": str(day)})
         tdnet_results = tdnet.download(day)
-        AuditLogger.log("INFO", "runner", "download_complete", {"edinet": len(edinet_results), "tdnet": len(tdnet_results)})
+
+        # register in DB
+        _register_documents(day, "EDINET", edinet_results, xbrl_flag=True, pdf_flag=False)
+        _register_documents(day, "TDnet", tdnet_results, xbrl_flag=False, pdf_flag=True)
+
+        AuditLogger.log(
+            "INFO",
+            "runner",
+            "download_complete",
+            {"edinet": len(edinet_results), "tdnet": len(tdnet_results)},
+        )
 
     AuditLogger.log("INFO", "runner", "end", {"run_id": str(run_id)})
+
+
+def _register_documents(
+    pub_date: date,
+    source: str,
+    files: list[pathlib.Path],
+    *,
+    xbrl_flag: bool,
+    pdf_flag: bool,
+) -> None:
+    for path in files:
+        sha256 = calc_sha256(path)
+        size = path.stat().st_size
+        doc_id = path.stem.split(".")[0]
+        record = {
+            "doc_id": doc_id,
+            "source": source,
+            "doc_type": "unknown",
+            "pub_date": pub_date,
+            "file_path": str(path),
+            "sha256": sha256,
+            "size_bytes": size,
+            "xbrl_flag": xbrl_flag,
+            "pdf_flag": pdf_flag,
+        }
+        db_module.upsert_document(record)
 
 
 if __name__ == "__main__":
