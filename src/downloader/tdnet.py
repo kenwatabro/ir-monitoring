@@ -17,30 +17,63 @@ RAW_DIR.mkdir(parents=True, exist_ok=True)
 
 # TDnet daily CSV list base URL
 LIST_BASE_URL = "https://www.release.tdnet.info/inbs"
+YANOSHIN_API_BASE = os.getenv("YANOSHIN_API_BASE", "https://webapi.yanoshin.jp/webapi/tdnet/list")
+
+
+def _fetch_list_api(day: date) -> List[dict]:
+    """Fetch list via webapi.yanoshin.jp (JSON).
+
+    Returns empty list if any error occurs.
+    """
+    ymd = day.strftime("%Y%m%d")
+    url = f"{YANOSHIN_API_BASE}/{ymd}.json"
+    logger.debug("Fetching TDnet list via yanoshin API: %s", url)
+    try:
+        resp = requests.get(url, timeout=30)
+        if resp.status_code != 200:
+            logger.warning("Yanoshin API returned status %s", resp.status_code)
+            return []
+        data = resp.json()
+        items = data.get("items") if isinstance(data, dict) else data  # API sometimes returns list at top
+        results: List[dict] = []
+        for obj in items:
+            try:
+                filename = obj.get("filename") or obj.get("document_url", "").split("/")[-1]
+                code = obj.get("code") or obj.get("security_code")
+                if filename and filename.lower().endswith(".pdf"):
+                    results.append({"code": code, "filename": filename})
+            except Exception:  # noqa: BLE001
+                continue
+        return results
+    except Exception as e:  # noqa: BLE001
+        logger.exception("Yanoshin API failure: %s", e)
+        return []
 
 
 def _fetch_list(day: date) -> List[dict]:
-    """Fetch TDnet daily disclosure list as list of dicts.
+    """Try Yanoshin API first; fallback to CSV scraping."""
+    results = _fetch_list_api(day)
+    if results:
+        return results
+    logger.info("Falling back to official CSV scraping for %s", day)
+    return _fetch_list_scrape(day)
 
-    The daily list is split into multiple CSV files: I_list_001_YYYYMMDD.csv, I_list_002_....
-    This function keeps downloading sequential parts until it receives a 404.
-    """
+
+def _fetch_list_scrape(day: date) -> List[dict]:
+    """Original CSV scraping implementation."""
     results: List[dict] = []
     ymd = day.strftime("%Y%m%d")
-    for idx in range(1, 10):  # assume at most 9 parts per day
+    for idx in range(1, 10):
         csv_name = f"I_list_{idx:03d}_{ymd}.csv"
         url = f"{LIST_BASE_URL}/{csv_name}"
-        logger.debug("Fetching TDnet list part %s", url)
+        logger.debug("Fetching TDnet CSV part %s", url)
         resp = requests.get(url, timeout=60)
         if resp.status_code == 404:
             if idx == 1:
-                logger.warning("No TDnet list found for %s", day)
+                logger.warning("No TDnet CSV found for %s", day)
             break
         resp.raise_for_status()
-        text = resp.text
-        reader = csv.reader(text.splitlines())
-        # TDnet CSV header fields (spec as of 2024-05):
-        # 0: 証券コード 1: 発表日時 2: タイトル 3: ファイル名 4: 備考
+        reader = csv.reader(resp.text.splitlines())
         for row in reader:
             if not row or row[0].startswith("#"):
                 continue

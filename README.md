@@ -1,6 +1,6 @@
 # IR Monitoring
 
-本リポジトリは、EDINET / TDnet から上場企業の IR 文書を収集・保存し、PostgreSQL + FastAPI で検索 API を提供するローカル基盤です。
+本リポジトリは、EDINET / TDnet（Yanoshin 非公式 API + HTML フォールバック）から上場企業の IR 文書を収集・保存し、PostgreSQL + FastAPI で検索 API を提供するローカル基盤です。
 
 ## セットアップ（ローカル）
 
