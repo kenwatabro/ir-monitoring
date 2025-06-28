@@ -57,3 +57,7 @@ Thumbs.db
 !docs/*.svg 
 
 実装手順.md
+
+data/
+
+docs/

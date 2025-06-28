@@ -4,6 +4,7 @@ import logging
 import os
 import pathlib
 import tempfile
+import zipfile
 from datetime import date
 from typing import List
 
@@ -15,7 +16,7 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 logger.setLevel(os.getenv("LOG_LEVEL", "INFO"))
 
-EDINET_BASE_URL = "https://disclosure.edinet-fsa.go.jp/api/v1"
+EDINET_BASE_URL = os.getenv("EDINET_BASE_URL", "https://api.edinet-fsa.go.jp/api/v2")
 RAW_DIR = pathlib.Path(os.getenv("RAW_DIR", "data/raw"))
 RAW_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -35,14 +36,13 @@ def _edinet_list(day: date) -> List[dict]:
     """
     params = {
         "date": day.strftime("%Y-%m-%d"),
-        "type": 2,  # JSON list
+        "type": 2,
+        "Subscription-Key": os.getenv("EDINET_API_KEY", ""),
     }
-    api_key = os.getenv("EDINET_API_KEY")
-    if api_key:
-        params["Subscription-Key"] = api_key
 
-    logger.info("Fetching EDINET list for %s", day)
-    resp = requests.get(f"{EDINET_BASE_URL}/documents.json", params=params, timeout=60)
+    logger.info("Fetching EDINET list for %s via v2", day)
+    headers = {"User-Agent": "ir-monitoring-bot/0.1"}
+    resp = requests.get(f"{EDINET_BASE_URL}/documents.json", params=params, headers=headers, timeout=60)
     resp.raise_for_status()
     data = resp.json()
     return data.get("results", [])
@@ -78,8 +78,18 @@ def _download_single(doc_id: str, dest_path: pathlib.Path) -> None:
     """Download a single document ZIP from EDINET."""
     params = {
         "type": 1,  # ZIP file
+        "Subscription-Key": os.getenv("EDINET_API_KEY", ""),
     }
-    resp = requests.get(f"{EDINET_BASE_URL}/documents/{doc_id}", params=params, stream=True, timeout=300)
+
+    headers = {"User-Agent": "ir-monitoring-bot/0.1"}
+
+    resp = requests.get(
+        f"{EDINET_BASE_URL}/documents/{doc_id}",
+        params=params,
+        headers=headers,
+        stream=True,
+        timeout=300,
+    )
     resp.raise_for_status()
     # Save incrementally to avoid memory blow-up
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
@@ -88,4 +98,11 @@ def _download_single(doc_id: str, dest_path: pathlib.Path) -> None:
                 tmp.write(chunk)
         tmp_path = pathlib.Path(tmp.name)
     tmp_path.replace(dest_path)
+
+    # Validate ZIP integrity; EDINET may return JSON error body with 200 OK
+    if not zipfile.is_zipfile(dest_path):
+        logger.warning("Invalid ZIP (likely JSON error) received for %s, removing", doc_id)
+        dest_path.unlink(missing_ok=True)
+        raise ValueError("Received non-ZIP content from EDINET API")
+
     logger.info("Saved %s", dest_path) 
