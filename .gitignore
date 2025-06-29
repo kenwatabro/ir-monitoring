@@ -61,3 +61,7 @@ Thumbs.db
 data/
 
 docs/
+
+*.ipynb
+*.ipynb.lock
+*.ipynb_checkpoints/
