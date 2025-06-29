@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from src import db as db_module
 from src.downloader import edinet, tdnet
 from src.downloader.storage import calc_sha256
+from src.downloader.macro import MacroAggregator
 
 load_dotenv()
 
@@ -42,6 +43,9 @@ def run_since(since: date, days: int = 1) -> None:
             day, "EDINET", edinet_results, xbrl_flag=True, pdf_flag=False
         )
         _register_documents(day, "TDnet", tdnet_results, xbrl_flag=False, pdf_flag=True)
+
+        # Macro series fetch & upsert
+        _upsert_macro(day)
 
         AuditLogger.log(
             "INFO",
@@ -77,6 +81,14 @@ def _register_documents(
             "pdf_flag": pdf_flag,
         }
         db_module.upsert_document(record)
+
+
+def _upsert_macro(day: date) -> None:
+    """Fetch macro series via MacroAggregator and upsert into DB."""
+    aggregator = MacroAggregator()
+    rows = aggregator.download(day)
+    for rec in rows:
+        db_module.upsert_macro_series(rec)
 
 
 if __name__ == "__main__":
