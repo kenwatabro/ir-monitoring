@@ -158,8 +158,6 @@ class MarketDownloader(BaseDownloader):
 # 従来 API ラッパ（即席利用向け）
 
 
-def download(
-    target_date: date, codes: List[str]
-) -> List[Dict[str, object]]:  # noqa: D401
+def download(target_date: date, codes: List[str]) -> List[Dict[str, object]]:  # noqa: D401
     """Backward-compatible functional API."""
     return MarketDownloader(codes).download(target_date)

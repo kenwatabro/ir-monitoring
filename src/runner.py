@@ -22,9 +22,7 @@ class AuditLogger:
     """Very simple console audit for now."""
 
     @staticmethod
-    def log(
-        level: str, module: str, action: str, detail: dict | None = None
-    ) -> None:  # noqa: D401
+    def log(level: str, module: str, action: str, detail: dict | None = None) -> None:  # noqa: D401
         logger.info("%s | %s | %s | %s", level, module, action, detail)
 
 

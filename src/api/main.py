@@ -20,9 +20,7 @@ def health() -> dict[str, str]:
 
 
 @app.get("/docs/{doc_id}", response_model=DocResponse)
-def get_doc(
-    doc_id: str, _: str = Depends(get_current_user)
-) -> DocResponse:  # noqa: D401
+def get_doc(doc_id: str, _: str = Depends(get_current_user)) -> DocResponse:  # noqa: D401
     # For now just return placeholder
     if not doc_id:
         raise HTTPException(status_code=404, detail="Document not found")
