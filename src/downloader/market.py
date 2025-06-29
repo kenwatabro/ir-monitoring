@@ -21,6 +21,7 @@ import requests
 
 # OOP 統一のための Downloader 基底クラス
 from ._base import BaseDownloader
+from .jquants_credit import JQuantsCreditDownloader
 
 logger = logging.getLogger(__name__)
 logger.setLevel(os.getenv("LOG_LEVEL", "INFO"))
@@ -133,7 +134,9 @@ def _download_impl(target_date: date, codes: List[str]) -> List[Dict[str, object
     # TDnet headlines (not per-code filter here for simplicity)
     results.extend(_fetch_tdnet_headlines(target_date))
 
-    # TODO: JPX 信用残高 (weekly) fetch
+    # JPX credit balances (weekly) – expensive, fetch once per day
+    credit_dl = JQuantsCreditDownloader(codes)
+    results.extend(credit_dl.download(target_date))
 
     return results
 

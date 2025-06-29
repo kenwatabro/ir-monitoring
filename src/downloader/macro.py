@@ -13,6 +13,8 @@ from typing import Dict, List
 
 from ._base import BaseDownloader
 from .fred_provider import FREDSeriesDownloader
+from .estat_provider import EStatSeriesDownloader
+from .bojstat_provider import BoJSeriesDownloader
 
 logger = logging.getLogger(__name__)
 logger.setLevel(os.getenv("LOG_LEVEL", "INFO"))
@@ -20,6 +22,8 @@ logger.setLevel(os.getenv("LOG_LEVEL", "INFO"))
 # Registry mapping prefix → factory
 _PROVIDER_FACTORIES: Dict[str, callable[[str], BaseDownloader]] = {
     "fred": lambda code: FREDSeriesDownloader(code),
+    "estat": lambda code: EStatSeriesDownloader(code),
+    "boj": lambda code: BoJSeriesDownloader(code),
 }
 
 
@@ -45,7 +49,7 @@ class MacroAggregator(BaseDownloader):
     name = "macro-aggregator"
 
     def __init__(self):
-        series_env = os.getenv("MACRO_SERIES", "T10Y2Y,PMI_US")
+        series_env = os.getenv("MACRO_SERIES", "T10Y2Y")
         self.series_list = [s.strip() for s in series_env.split(",") if s.strip()]
         self.providers = _build_downloaders(self.series_list)
 

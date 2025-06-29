@@ -42,3 +42,40 @@ def upsert_document(record: Mapping[str, object]) -> None:
             conn.execute(sql, record)
         except IntegrityError:
             pass
+
+
+# -------------------------------------------------------------
+# Macro series helpers
+# -------------------------------------------------------------
+
+
+def upsert_macro_series(record: Mapping[str, object]) -> None:
+    """Insert or update a single macro series point.
+
+    Schema expectation for *macro_series* table::
+
+        CREATE TABLE macro_series (
+            series_id  TEXT,
+            ts_date    DATE,
+            value      DOUBLE PRECISION,
+            src        TEXT,
+            PRIMARY KEY (series_id, ts_date)
+        );
+    """
+
+    sql = text(
+        """
+        INSERT INTO macro_series (
+            series_id, ts_date, value, src
+        ) VALUES (
+            :series_id, :ts_date, :value, :src
+        ) ON CONFLICT (series_id, ts_date)
+          DO UPDATE SET value = EXCLUDED.value, src = EXCLUDED.src
+        """
+    )
+
+    with session_scope() as conn:
+        try:
+            conn.execute(sql, record)
+        except IntegrityError:
+            pass

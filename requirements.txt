@@ -12,3 +12,5 @@ pikepdf==9.2.0
 pillow==10.3.0
 pyjwt==2.8.0 
 fredapi==0.5.0
+jquants-api-client==1.8.0
+responses==0.25.7
