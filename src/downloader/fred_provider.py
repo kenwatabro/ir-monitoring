@@ -30,7 +30,11 @@ class FREDSeriesDownloader(BaseDownloader):
             logger.warning("fredapi not installed; skipping %s", self.series_id)
             return []
         try:
-            value = self._fred.get_series(self.series_id, observation_start=target_date, observation_end=target_date)
+            value = self._fred.get_series(
+                self.series_id,
+                observation_start=target_date,
+                observation_end=target_date,
+            )
             if value.empty:
                 return []
             return [
@@ -43,4 +47,4 @@ class FREDSeriesDownloader(BaseDownloader):
             ]
         except Exception as exc:  # noqa: BLE001
             logger.exception("FRED fetch error for %s: %s", self.series_id, exc)
-            return [] 
+            return []

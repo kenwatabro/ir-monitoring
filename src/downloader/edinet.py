@@ -11,6 +11,9 @@ from typing import List
 import requests
 from dotenv import load_dotenv
 
+# OOP 統一のための Downloader 基底クラス
+from ._base import FileDownloader
+
 load_dotenv()
 
 logger = logging.getLogger(__name__)
@@ -42,17 +45,16 @@ def _edinet_list(day: date) -> List[dict]:
 
     logger.info("Fetching EDINET list for %s via v2", day)
     headers = {"User-Agent": "ir-monitoring-bot/0.1"}
-    resp = requests.get(f"{EDINET_BASE_URL}/documents.json", params=params, headers=headers, timeout=60)
+    resp = requests.get(
+        f"{EDINET_BASE_URL}/documents.json", params=params, headers=headers, timeout=60
+    )
     resp.raise_for_status()
     data = resp.json()
     return data.get("results", [])
 
 
-def download(day: date) -> List[pathlib.Path]:
-    """Download all EDINET documents of the day and save to RAW_DIR.
-
-    Returns list of saved file paths.
-    """
+def _download_impl(day: date) -> List[pathlib.Path]:
+    """実際のダウンロード処理本体 (以前の download 関数)。"""
     results: List[pathlib.Path] = []
     for item in _edinet_list(day):
         doc_id = item.get("docID")
@@ -101,8 +103,33 @@ def _download_single(doc_id: str, dest_path: pathlib.Path) -> None:
 
     # Validate ZIP integrity; EDINET may return JSON error body with 200 OK
     if not zipfile.is_zipfile(dest_path):
-        logger.warning("Invalid ZIP (likely JSON error) received for %s, removing", doc_id)
+        logger.warning(
+            "Invalid ZIP (likely JSON error) received for %s, removing", doc_id
+        )
         dest_path.unlink(missing_ok=True)
         raise ValueError("Received non-ZIP content from EDINET API")
 
-    logger.info("Saved %s", dest_path) 
+    logger.info("Saved %s", dest_path)
+
+
+# -------------------------------------------------------------
+# Class-based Downloader
+# -------------------------------------------------------------
+
+
+class EdinetDownloader(FileDownloader):
+    """EDINET ZIP ドキュメントを日付単位で取得する Downloader。"""
+
+    name = "edinet"
+
+    def download(self, target_date: date) -> List[pathlib.Path]:  # noqa: D401
+        return _download_impl(target_date)
+
+
+# 既存 API を壊さないための関数ラッパ
+_downloader = EdinetDownloader()
+
+
+def download(day: date) -> List[pathlib.Path]:  # noqa: D401
+    """Backward-compatible functional API."""
+    return _downloader.download(day)

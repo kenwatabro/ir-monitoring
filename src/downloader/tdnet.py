@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 import csv
 import logging
 import os
@@ -17,7 +18,12 @@ RAW_DIR.mkdir(parents=True, exist_ok=True)
 
 # TDnet daily CSV list base URL
 LIST_BASE_URL = "https://www.release.tdnet.info/inbs"
-YANOSHIN_API_BASE = os.getenv("YANOSHIN_API_BASE", "https://webapi.yanoshin.jp/webapi/tdnet/list")
+YANOSHIN_API_BASE = os.getenv(
+    "YANOSHIN_API_BASE", "https://webapi.yanoshin.jp/webapi/tdnet/list"
+)
+
+# OOP 統一のための Downloader 基底クラス
+from ._base import FileDownloader
 
 
 def _fetch_list_api(day: date) -> List[dict]:
@@ -34,7 +40,9 @@ def _fetch_list_api(day: date) -> List[dict]:
             logger.warning("Yanoshin API returned status %s", resp.status_code)
             return []
         data = resp.json()
-        items = data.get("items") if isinstance(data, dict) else data  # API sometimes returns list at top
+        items = (
+            data.get("items") if isinstance(data, dict) else data
+        )  # API sometimes returns list at top
         results: List[dict] = []
         for obj in items:
             try:
@@ -44,7 +52,10 @@ def _fetch_list_api(day: date) -> List[dict]:
                     filename = rec.get("document_url", "").split("/")[-1]
                     code = rec.get("company_code")
                 else:
-                    filename = obj.get("filename") or obj.get("document_url", "").split("/")[-1]
+                    filename = (
+                        obj.get("filename")
+                        or obj.get("document_url", "").split("/")[-1]
+                    )
                     code = obj.get("code") or obj.get("security_code")
                 if filename and filename.lower().endswith(".pdf"):
                     results.append({"code": code, "filename": filename})
@@ -108,11 +119,8 @@ def _download_pdf(filename: str, dest_path: pathlib.Path) -> None:
     logger.info("Saved %s", dest_path)
 
 
-def download(day: date) -> List[pathlib.Path]:
-    """Download all TDnet PDFs for the given day.
-
-    Returns list of saved file paths.
-    """
+def _download_impl(day: date) -> List[pathlib.Path]:
+    """実際のダウンロード処理本体 (以前の download 関数)。"""
     saved: List[pathlib.Path] = []
     for item in _fetch_list(day):
         filename = item["filename"]
@@ -129,4 +137,27 @@ def download(day: date) -> List[pathlib.Path]:
             saved.append(dest_path)
         except Exception as e:  # noqa: BLE001
             logger.exception("Failed to download TDnet file %s: %s", filename, e)
-    return saved 
+    return saved
+
+
+# -------------------------------------------------------------
+# Class-based Downloader
+# -------------------------------------------------------------
+
+
+class TdnetDownloader(FileDownloader):
+    """TDnet PDF を日付単位で取得する Downloader。"""
+
+    name = "tdnet"
+
+    def download(self, target_date: date) -> List[pathlib.Path]:  # noqa: D401
+        return _download_impl(target_date)
+
+
+# 既存 API を壊さないための関数ラッパ
+_downloader = TdnetDownloader()
+
+
+def download(day: date) -> List[pathlib.Path]:  # noqa: D401
+    """Backward-compatible functional API."""
+    return _downloader.download(day)

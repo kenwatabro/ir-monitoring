@@ -1,1 +1,1 @@
-"""Parser layer extracting data from raw documents (XBRL, OCR).""" 
+"""Parser layer extracting data from raw documents (XBRL, OCR)."""

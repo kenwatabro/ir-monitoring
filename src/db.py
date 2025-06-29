@@ -41,4 +41,4 @@ def upsert_document(record: Mapping[str, object]) -> None:
         try:
             conn.execute(sql, record)
         except IntegrityError:
-            pass 
+            pass

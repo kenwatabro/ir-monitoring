@@ -1,1 +1,1 @@
-"""IR Monitoring Project package root.""" 
+"""IR Monitoring Project package root."""

@@ -48,4 +48,4 @@ def extract_facts(xbrl_path: str) -> List[XbrlFact]:
             )
         )
     logger.debug("Extracted %d facts from %s", len(facts), xbrl_path)
-    return facts 
+    return facts

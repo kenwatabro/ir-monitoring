@@ -24,4 +24,4 @@ def get_doc(doc_id: str, _: str = Depends(get_current_user)) -> DocResponse:  # 
     # For now just return placeholder
     if not doc_id:
         raise HTTPException(status_code=404, detail="Document not found")
-    return DocResponse(doc_id=doc_id, source="EDINET", url=f"/download/{doc_id}") 
+    return DocResponse(doc_id=doc_id, source="EDINET", url=f"/download/{doc_id}")
