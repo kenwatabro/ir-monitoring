@@ -24,6 +24,8 @@ def ir_daily_flow() -> None:  # noqa: D401
 DeploymentSpec(
     flow=ir_daily_flow,
     name="daily-0800-jst",
-    schedule=CronSchedule(cron="0 23 * * *", timezone="Asia/Tokyo"),  # 08:00 JST == 23:00 UTC prev day
+    schedule=CronSchedule(
+        cron="0 23 * * *", timezone="Asia/Tokyo"
+    ),  # 08:00 JST == 23:00 UTC prev day
     tags=["ir"],
-) 
+)

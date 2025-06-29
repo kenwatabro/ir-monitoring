@@ -73,7 +73,9 @@ def _fetch_stooq(code: str, target_date: date) -> List[Dict[str, object]]:
 # Yanoshin headline API
 # --------------------------------------------------------------------------------------
 
-YANOSHIN_BASE = os.getenv("YANOSHIN_API_BASE", "https://webapi.yanoshin.jp/webapi/tdnet/list")
+YANOSHIN_BASE = os.getenv(
+    "YANOSHIN_API_BASE", "https://webapi.yanoshin.jp/webapi/tdnet/list"
+)
 
 
 def _fetch_tdnet_headlines(target_date: date) -> List[Dict[str, object]]:
@@ -87,16 +89,18 @@ def _fetch_tdnet_headlines(target_date: date) -> List[Dict[str, object]]:
         items = data.get("items") if isinstance(data, dict) else data
         results: List[Dict[str, object]] = []
         for obj in items:
-            if 'Tdnet' in obj:
-                d = obj['Tdnet']
-                code = d.get('company_code') or d.get('code')
-                headline = d.get('title')
+            if "Tdnet" in obj:
+                d = obj["Tdnet"]
+                code = d.get("company_code") or d.get("code")
+                headline = d.get("title")
             else:
-                code = obj.get('code') or obj.get('security_code')
-                headline = obj.get('title') or obj.get('headline')
+                code = obj.get("code") or obj.get("security_code")
+                headline = obj.get("title") or obj.get("headline")
             if not (code and headline):
                 continue
-            sentiment = 1 if any(k in headline for k in ["上方修正", "自社株買", "増配"]) else 0
+            sentiment = (
+                1 if any(k in headline for k in ["上方修正", "自社株買", "増配"]) else 0
+            )
             results.append(
                 {
                     "code_jpx": code,
@@ -115,6 +119,7 @@ def _fetch_tdnet_headlines(target_date: date) -> List[Dict[str, object]]:
 # --------------------------------------------------------------------------------------
 # Public API
 # --------------------------------------------------------------------------------------
+
 
 def _download_impl(target_date: date, codes: List[str]) -> List[Dict[str, object]]:
     """実際のダウンロード処理 (以前の download 関数)。"""
@@ -155,4 +160,4 @@ class MarketDownloader(BaseDownloader):
 
 def download(target_date: date, codes: List[str]) -> List[Dict[str, object]]:  # noqa: D401
     """Backward-compatible functional API."""
-    return MarketDownloader(codes).download(target_date) 
+    return MarketDownloader(codes).download(target_date)

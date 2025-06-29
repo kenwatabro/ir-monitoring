@@ -59,4 +59,4 @@ class FileDownloader(GenericDownloader[List[pathlib.Path]]):
 
     @abstractmethod
     def download(self, target_date: date) -> List[pathlib.Path]:  # noqa: D401
-        """Download files for *target_date* and return a list of saved paths.""" 
+        """Download files for *target_date* and return a list of saved paths."""

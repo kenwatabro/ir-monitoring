@@ -33,4 +33,4 @@ def calc_sha256(path: pathlib.Path) -> str:
     with path.open("rb") as fp:
         for chunk in iter(lambda: fp.read(BUFFER_SIZE), b""):
             sha256.update(chunk)
-    return sha256.hexdigest() 
+    return sha256.hexdigest()

@@ -46,4 +46,4 @@ def test_market_downloader():
 def test_esg_downloader():
     dl = ESGDownloader("TEST")
     res = dl.download(date.today())
-    assert res and res[0]["metric"] == "E" 
+    assert res and res[0]["metric"] == "E"

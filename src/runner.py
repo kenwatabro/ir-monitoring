@@ -38,7 +38,9 @@ def run_since(since: date, days: int = 1) -> None:
         tdnet_results = tdnet.download(day)
 
         # register in DB
-        _register_documents(day, "EDINET", edinet_results, xbrl_flag=True, pdf_flag=False)
+        _register_documents(
+            day, "EDINET", edinet_results, xbrl_flag=True, pdf_flag=False
+        )
         _register_documents(day, "TDnet", tdnet_results, xbrl_flag=False, pdf_flag=True)
 
         AuditLogger.log(
@@ -85,4 +87,4 @@ if __name__ == "__main__":
     parser.add_argument("--days", type=int, default=1)
     args = parser.parse_args()
 
-    run_since(args.since, args.days) 
+    run_since(args.since, args.days)

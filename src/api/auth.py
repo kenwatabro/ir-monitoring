@@ -29,13 +29,20 @@ def create_access_token(subject: str, expires_delta: timedelta | None = None) ->
     return jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
-def get_current_user(credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)]) -> str:
+def get_current_user(
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+) -> str:
     token = credentials.credentials
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         sub: str = payload.get("sub")  # type: ignore[assignment]
         if sub is None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid JWT payload")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid JWT payload"
+            )
         return sub
     except jwt.PyJWTError as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials") from exc 
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        ) from exc

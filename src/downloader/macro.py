@@ -59,5 +59,6 @@ class MacroAggregator(BaseDownloader):
 # Convenience functional API (backward-compat)
 _aggregator = MacroAggregator()
 
+
 def download(target_date: date) -> List[Dict[str, object]]:  # noqa: D401
-    return _aggregator.download(target_date) 
+    return _aggregator.download(target_date)

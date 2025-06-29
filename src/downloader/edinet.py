@@ -45,7 +45,9 @@ def _edinet_list(day: date) -> List[dict]:
 
     logger.info("Fetching EDINET list for %s via v2", day)
     headers = {"User-Agent": "ir-monitoring-bot/0.1"}
-    resp = requests.get(f"{EDINET_BASE_URL}/documents.json", params=params, headers=headers, timeout=60)
+    resp = requests.get(
+        f"{EDINET_BASE_URL}/documents.json", params=params, headers=headers, timeout=60
+    )
     resp.raise_for_status()
     data = resp.json()
     return data.get("results", [])
@@ -101,7 +103,9 @@ def _download_single(doc_id: str, dest_path: pathlib.Path) -> None:
 
     # Validate ZIP integrity; EDINET may return JSON error body with 200 OK
     if not zipfile.is_zipfile(dest_path):
-        logger.warning("Invalid ZIP (likely JSON error) received for %s, removing", doc_id)
+        logger.warning(
+            "Invalid ZIP (likely JSON error) received for %s, removing", doc_id
+        )
         dest_path.unlink(missing_ok=True)
         raise ValueError("Received non-ZIP content from EDINET API")
 
@@ -128,4 +132,4 @@ _downloader = EdinetDownloader()
 
 def download(day: date) -> List[pathlib.Path]:  # noqa: D401
     """Backward-compatible functional API."""
-    return _downloader.download(day) 
+    return _downloader.download(day)

@@ -22,7 +22,9 @@ from ._base import BaseDownloader
 logger = logging.getLogger(__name__)
 logger.setLevel(os.getenv("LOG_LEVEL", "INFO"))
 
-FMP_BASE = "https://financialmodelingprep.com/api/v4/esg-environmental-social-governance-data"
+FMP_BASE = (
+    "https://financialmodelingprep.com/api/v4/esg-environmental-social-governance-data"
+)
 
 
 def _fetch_fmp(ticker: str) -> List[Dict[str, object]]:
@@ -87,4 +89,4 @@ class ESGDownloader(BaseDownloader):
 
 def download(ticker: str) -> List[Dict[str, object]]:  # noqa: D401
     """Backward-compatible functional API."""
-    return ESGDownloader(ticker).download(date.today()) 
+    return ESGDownloader(ticker).download(date.today())
