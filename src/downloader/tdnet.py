@@ -38,8 +38,14 @@ def _fetch_list_api(day: date) -> List[dict]:
         results: List[dict] = []
         for obj in items:
             try:
-                filename = obj.get("filename") or obj.get("document_url", "").split("/")[-1]
-                code = obj.get("code") or obj.get("security_code")
+                # Yanoshin API v2 (2024-) wraps payload under 'Tdnet' key
+                if "Tdnet" in obj:
+                    rec = obj["Tdnet"]
+                    filename = rec.get("document_url", "").split("/")[-1]
+                    code = rec.get("company_code")
+                else:
+                    filename = obj.get("filename") or obj.get("document_url", "").split("/")[-1]
+                    code = obj.get("code") or obj.get("security_code")
                 if filename and filename.lower().endswith(".pdf"):
                     results.append({"code": code, "filename": filename})
             except Exception:  # noqa: BLE001
