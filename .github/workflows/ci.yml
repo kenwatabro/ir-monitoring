@@ -29,14 +29,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-      - name: Lint
+      - name: Lint and Format Check
         run: |
           ruff check .
-          black --check .
-          isort --check-only .
+          ruff format --check .
 
       - name: Unit tests
-        run: pytest --cov=src --cov-report=xml
-
-      - name: Ruff format check
-        run: ruff format --check . 
+        run: pytest --cov=src --cov-report=xml 
