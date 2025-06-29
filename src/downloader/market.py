@@ -15,7 +15,7 @@ import logging
 import os
 import pathlib
 from datetime import date
-from typing import List, Dict
+from typing import Dict, List
 
 import requests
 

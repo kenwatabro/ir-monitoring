@@ -13,7 +13,7 @@ Functions return list of dicts compatible with `esg_scores` table.
 import logging
 import os
 from datetime import date
-from typing import List, Dict
+from typing import Dict, List
 
 import requests
 

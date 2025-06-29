@@ -7,11 +7,10 @@ Every data source should implement `BaseDownloader.download` and return
 `list[dict]` that is compatible with its target table.
 """
 
+import pathlib
 from abc import ABC, abstractmethod
 from datetime import date
-import pathlib
 from typing import Dict, Generic, List, TypeVar
-
 
 # -------------------------------------------------------------
 # Generic abstractions
