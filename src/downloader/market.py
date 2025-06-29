@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 from __future__ import annotations
 
 """Downloader for market & flow related series.
@@ -13,11 +14,13 @@ import csv
 import logging
 import os
 import pathlib
-import tempfile
 from datetime import date
 from typing import List, Dict
 
 import requests
+
+# OOP 統一のための Downloader 基底クラス
+from ._base import BaseDownloader
 
 logger = logging.getLogger(__name__)
 logger.setLevel(os.getenv("LOG_LEVEL", "INFO"))
@@ -113,8 +116,8 @@ def _fetch_tdnet_headlines(target_date: date) -> List[Dict[str, object]]:
 # Public API
 # --------------------------------------------------------------------------------------
 
-def download(target_date: date, codes: List[str]) -> List[Dict[str, object]]:  # noqa: D401
-    """Fetch market series (OHLCV, headline sentiment) for given *codes* (JPX 4桁)。"""
+def _download_impl(target_date: date, codes: List[str]) -> List[Dict[str, object]]:
+    """実際のダウンロード処理 (以前の download 関数)。"""
 
     results: List[Dict[str, object]] = []
 
@@ -127,4 +130,29 @@ def download(target_date: date, codes: List[str]) -> List[Dict[str, object]]:  #
 
     # TODO: JPX 信用残高 (weekly) fetch
 
-    return results 
+    return results
+
+
+# -------------------------------------------------------------
+# Class-based Downloader
+# -------------------------------------------------------------
+
+
+class MarketDownloader(BaseDownloader):
+    """指定コード群に対するマーケットデータ Downloader。"""
+
+    name = "market"
+
+    def __init__(self, codes: List[str]):
+        self.codes = codes
+
+    def download(self, target_date: date) -> List[Dict[str, object]]:  # noqa: D401
+        return _download_impl(target_date, self.codes)
+
+
+# 従来 API ラッパ（即席利用向け）
+
+
+def download(target_date: date, codes: List[str]) -> List[Dict[str, object]]:  # noqa: D401
+    """Backward-compatible functional API."""
+    return MarketDownloader(codes).download(target_date) 

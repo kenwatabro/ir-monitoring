@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 from __future__ import annotations
 
 """Aggregate macro downloader using provider plugins.
@@ -8,7 +9,6 @@ Configured via MACRO_SERIES env var; each code maps to a provider instance.
 import logging
 import os
 from datetime import date
-from importlib import import_module
 from typing import Dict, List
 
 from ._base import BaseDownloader
@@ -59,5 +59,5 @@ class MacroAggregator(BaseDownloader):
 # Convenience functional API (backward-compat)
 _aggregator = MacroAggregator()
 
-def download(target_date: date):  # noqa: D401
+def download(target_date: date) -> List[Dict[str, object]]:  # noqa: D401
     return _aggregator.download(target_date) 
