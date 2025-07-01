@@ -6,16 +6,33 @@ from datetime import date, timedelta
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 
+# -------------------------------------------------------------
+# Env helper
+# -------------------------------------------------------------
+
+
+def _first_token(env_name: str, default: str = "") -> str:
+    """環境変数値の先頭トークンを返す。
+
+    - 値が空、未設定、または空白のみの場合は *default* を返す。
+    - 行末コメント " # xxxx" を除去するために空白区切りの 1 つ目だけ取得。
+    """
+
+    val = os.getenv(env_name)
+    if not val or not val.strip():
+        val = default
+    return val.strip().split()[0]
+
+
 # Build PostgreSQL URL from env vars if DATABASE_URL not provided
 if url := os.getenv("DATABASE_URL"):
     DB_URL = url
 else:
-    host = os.getenv("POSTGRES_HOST", "localhost").split()[0]
-    # コメントや余計な空白が入っても問題ないように最初のトークンだけ取得
-    port = os.getenv("POSTGRES_PORT", "5432").split()[0]
-    database = os.getenv("POSTGRES_DB", "ir_db").split()[0]
-    user = os.getenv("POSTGRES_USER", "postgres").split()[0]
-    password = os.getenv("POSTGRES_PASSWORD", "").split()[0]
+    host = _first_token("POSTGRES_HOST", "localhost")
+    port = _first_token("POSTGRES_PORT", "5432")
+    database = _first_token("POSTGRES_DB", "ir_db")
+    user = _first_token("POSTGRES_USER", "postgres")
+    password = _first_token("POSTGRES_PASSWORD", "")
     DB_URL = f"postgresql://{user}:{password}@{host}:{port}/{database}"
 
 engine = create_engine(DB_URL, pool_pre_ping=True, future=True)
