@@ -21,7 +21,8 @@ def _first_token(env_name: str, default: str = "") -> str:
     val = os.getenv(env_name)
     if not val or not val.strip():
         val = default
-    return val.strip().split()[0]
+    tokens = val.strip().split()
+    return tokens[0] if tokens else default
 
 
 # Build PostgreSQL URL from env vars if DATABASE_URL not provided
