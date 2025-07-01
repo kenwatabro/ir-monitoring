@@ -7,6 +7,7 @@ import tempfile
 import zipfile
 from datetime import date
 from typing import List
+import time
 
 import requests
 from dotenv import load_dotenv
@@ -22,6 +23,10 @@ logger.setLevel(os.getenv("LOG_LEVEL", "INFO"))
 EDINET_BASE_URL = os.getenv("EDINET_BASE_URL", "https://api.edinet-fsa.go.jp/api/v2")
 RAW_DIR = pathlib.Path(os.getenv("RAW_DIR", "data/raw"))
 RAW_DIR.mkdir(parents=True, exist_ok=True)
+
+# Which docTypeCode has ZIP (=XBRL) available
+_ZIP_TYPES = {"120", "130"}  # 有価証券報告書・四半期報告書など
+# その他は PDF のみ
 
 
 def _edinet_list(day: date) -> List[dict]:
@@ -58,31 +63,106 @@ def _download_impl(day: date) -> List[pathlib.Path]:
     results: List[pathlib.Path] = []
     for item in _edinet_list(day):
         doc_id = item.get("docID")
+        dtype = str(item.get("docTypeCode", ""))
+        xbrl_flag = str(item.get("xbrlFlag")) == "1"
         if not doc_id:
             continue
-        dest_dir = RAW_DIR / day.strftime("%Y/%m/%d") / doc_id
+        dest_dir = RAW_DIR / "EDINET" / day.strftime("%Y/%m/%d") / doc_id
         dest_dir.mkdir(parents=True, exist_ok=True)
-        dest_path = dest_dir / f"{doc_id}.zip"
+
+        is_zip = xbrl_flag and dtype in _ZIP_TYPES
+        ext = "zip" if is_zip else "pdf"
+        dest_path = dest_dir / f"{doc_id}.{ext}"
         if dest_path.exists():
-            logger.debug("Skip existing %s", dest_path)
             results.append(dest_path)
             continue
 
         try:
-            _download_single(doc_id, dest_path)
+            if is_zip:
+                _download_single(doc_id, dest_path, attempts=3)
+            else:
+                _download_pdf_only(doc_id, dest_path)
             results.append(dest_path)
         except Exception as e:  # noqa: BLE001
             logger.exception("Failed to download %s: %s", doc_id, e)
     return results
 
 
-def _download_single(doc_id: str, dest_path: pathlib.Path) -> None:
-    """Download a single document ZIP from EDINET."""
+def _download_single(
+    doc_id: str, dest_path: pathlib.Path, *, attempts: int = 3, backoff: int = 20
+) -> None:
+    """Download a single document ZIP with simple retry logic.
+
+    EDINET は docID 公開後に ZIP 生成が遅延するため、先に取得を試みると
+    JSON エラー本文を 200 OK で返してくる場合がある。その際は
+    `zipfile.is_zipfile()` が False になるので、一定間隔で再試行する。
+
+    Parameters
+    ----------
+    doc_id : str
+        Document ID
+    dest_path : Path
+        保存先パス
+    attempts : int, default 3
+        最大リトライ回数
+    backoff : int, default 20
+        リトライ間隔（秒）
+    """
     params = {
         "type": 1,  # ZIP file
         "Subscription-Key": os.getenv("EDINET_API_KEY", ""),
     }
 
+    headers = {"User-Agent": "ir-monitoring-bot/0.1"}
+
+    for attempt in range(1, attempts + 1):
+        resp = requests.get(
+            f"{EDINET_BASE_URL}/documents/{doc_id}",
+            params=params,
+            headers=headers,
+            stream=True,
+            timeout=300,
+        )
+        resp.raise_for_status()
+
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            for chunk in resp.iter_content(chunk_size=8192):
+                if chunk:
+                    tmp.write(chunk)
+            tmp_path = pathlib.Path(tmp.name)
+        tmp_path.replace(dest_path)
+
+        if zipfile.is_zipfile(dest_path):
+            logger.info("Saved %s", dest_path)
+            return
+
+        # Not a valid ZIP → likely still processing
+        dest_path.unlink(missing_ok=True)
+        if attempt < attempts:
+            logger.info(
+                "ZIP not ready for %s (attempt %d/%d): retrying in %ss",
+                doc_id,
+                attempt,
+                attempts,
+                backoff,
+            )
+            time.sleep(backoff)
+        else:
+            raise ValueError("Received non-ZIP content from EDINET API after retries")
+
+
+# ------------------------------------------------------------------
+# PDF download helper for non-XBRL documents
+# ------------------------------------------------------------------
+
+
+def _download_pdf_only(doc_id: str, dest_path: pathlib.Path) -> None:
+    """Download PDF for documents where ZIP is not provided."""
+
+    params = {
+        "type": 2,  # PDF
+        "Subscription-Key": os.getenv("EDINET_API_KEY", ""),
+    }
     headers = {"User-Agent": "ir-monitoring-bot/0.1"}
 
     resp = requests.get(
@@ -93,23 +173,14 @@ def _download_single(doc_id: str, dest_path: pathlib.Path) -> None:
         timeout=300,
     )
     resp.raise_for_status()
-    # Save incrementally to avoid memory blow-up
+
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
         for chunk in resp.iter_content(chunk_size=8192):
             if chunk:
                 tmp.write(chunk)
         tmp_path = pathlib.Path(tmp.name)
     tmp_path.replace(dest_path)
-
-    # Validate ZIP integrity; EDINET may return JSON error body with 200 OK
-    if not zipfile.is_zipfile(dest_path):
-        logger.warning(
-            "Invalid ZIP (likely JSON error) received for %s, removing", doc_id
-        )
-        dest_path.unlink(missing_ok=True)
-        raise ValueError("Received non-ZIP content from EDINET API")
-
-    logger.info("Saved %s", dest_path)
+    logger.info("Saved PDF %s", dest_path)
 
 
 # -------------------------------------------------------------

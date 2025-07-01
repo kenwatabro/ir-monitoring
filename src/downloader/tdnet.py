@@ -125,7 +125,7 @@ def _download_impl(day: date) -> List[pathlib.Path]:
     for item in _fetch_list(day):
         filename = item["filename"]
         doc_id = pathlib.Path(filename).stem  # remove .pdf
-        dest_dir = RAW_DIR / day.strftime("%Y/%m/%d") / doc_id
+        dest_dir = RAW_DIR / "TDnet" / day.strftime("%Y/%m/%d") / doc_id
         dest_dir.mkdir(parents=True, exist_ok=True)
         dest_path = dest_dir / filename
         if dest_path.exists():

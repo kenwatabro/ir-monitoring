@@ -1,6 +1,7 @@
 import os
 from contextlib import contextmanager
 from typing import Iterator, Mapping
+from datetime import date, timedelta
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
@@ -9,11 +10,12 @@ from sqlalchemy.exc import IntegrityError
 if url := os.getenv("DATABASE_URL"):
     DB_URL = url
 else:
-    host = os.getenv("POSTGRES_HOST", "localhost")
-    port = os.getenv("POSTGRES_PORT", "5432")
-    database = os.getenv("POSTGRES_DB", "ir_db")
-    user = os.getenv("POSTGRES_USER", "postgres")
-    password = os.getenv("POSTGRES_PASSWORD", "")
+    host = os.getenv("POSTGRES_HOST", "localhost").split()[0]
+    # コメントや余計な空白が入っても問題ないように最初のトークンだけ取得
+    port = os.getenv("POSTGRES_PORT", "5432").split()[0]
+    database = os.getenv("POSTGRES_DB", "ir_db").split()[0]
+    user = os.getenv("POSTGRES_USER", "postgres").split()[0]
+    password = os.getenv("POSTGRES_PASSWORD", "").split()[0]
     DB_URL = f"postgresql://{user}:{password}@{host}:{port}/{database}"
 
 engine = create_engine(DB_URL, pool_pre_ping=True, future=True)
@@ -26,15 +28,42 @@ def session_scope() -> Iterator[None]:
         yield conn
 
 
+def _ensure_documents_partition(pub_date: date) -> None:
+    """指定された pub_date 用の月次パーティションを作成 (存在しなければ)。"""
+    first_day = pub_date.replace(day=1)
+    # 次月 1 日を計算
+    next_month = (first_day + timedelta(days=32)).replace(day=1)
+    part_name = f"documents_{first_day.strftime('%Y_%m')}"
+
+    create_sql = text(
+        f"""
+        CREATE TABLE IF NOT EXISTS {part_name} PARTITION OF documents
+        FOR VALUES FROM ('{first_day.isoformat()}') TO ('{next_month.isoformat()}');
+        """
+    )
+
+    with session_scope() as conn:
+        conn.execute(create_sql)
+
+
 def upsert_document(record: Mapping[str, object]) -> None:
-    """Insert a row into documents if not exists (by doc_id)."""
+    """Insert a row into documents if not exists (by doc_id, pub_date).
+
+    挿入前に対象月のパーティションを自動生成する。
+    """
+
+    # パーティションを事前に確保 (月次)
+    pub_date = record["pub_date"]
+    if isinstance(pub_date, date):
+        _ensure_documents_partition(pub_date)
+
     sql = text(
         """
         INSERT INTO documents (
             doc_id, source, doc_type, pub_date, file_path, sha256, size_bytes, xbrl_flag, pdf_flag
         ) VALUES (
             :doc_id, :source, :doc_type, :pub_date, :file_path, :sha256, :size_bytes, :xbrl_flag, :pdf_flag
-        ) ON CONFLICT (doc_id) DO NOTHING
+        ) ON CONFLICT (doc_id, pub_date) DO NOTHING
         """
     )
     with session_scope() as conn:
