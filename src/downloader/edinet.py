@@ -73,7 +73,9 @@ def _is_corporate_report(meta: dict) -> bool:
 
     # ordinanceCode はゼロ詰め 3 桁の文字列として返る
     # fundCode は投資信託等の場合にのみ文字列で入り、それ以外は None
-    return meta.get("ordinanceCode") == "010" and not meta.get("fundCode")
+    ord_code = meta.get("ordinanceCode")
+    # ordinanceCode が未提供(None)の場合も通常の報告書として扱う
+    return (ord_code is None or ord_code == "010") and not meta.get("fundCode")
 
 
 def _download_impl(day: date) -> List[pathlib.Path]:
