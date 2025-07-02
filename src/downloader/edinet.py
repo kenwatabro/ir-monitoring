@@ -58,10 +58,39 @@ def _edinet_list(day: date) -> List[dict]:
     return data.get("results", [])
 
 
+def _is_corporate_report(meta: dict) -> bool:
+    """Return True if the EDINET metadata represents a corporate (listed company) report.
+
+    EDINET API v2 metadata fields:
+
+    * ordinanceCode "010"   … 会社法/金融商品取引法に基づく通常の有報・四半期報など
+    * fundCode      None     … 投資信託・投資法人の場合は 5 桁程度のコードが入る
+
+    アセットマネジメント会社が提出する投資信託の報告書等を除外するため、
+    上記の組み合わせ（ordinanceCode=="010" かつ fundCode が空）を満たす
+    レコードのみをダウンロード対象とする。
+    """
+
+    # ordinanceCode はゼロ詰め 3 桁の文字列として返る
+    # fundCode は投資信託等の場合にのみ文字列で入り、それ以外は None
+    ord_code = meta.get("ordinanceCode")
+    # ordinanceCode が未提供(None)の場合も通常の報告書として扱う
+    return (ord_code is None or ord_code == "010") and not meta.get("fundCode")
+
+
 def _download_impl(day: date) -> List[pathlib.Path]:
     """実際のダウンロード処理本体 (以前の download 関数)。"""
     results: List[pathlib.Path] = []
     for item in _edinet_list(day):
+        # 投資信託・ETF 等の書類を除外
+        if not _is_corporate_report(item):
+            logger.debug(
+                "Skip non-corporate report: %s ordinance=%s fund=%s",
+                item.get("docID"),
+                item.get("ordinanceCode"),
+                item.get("fundCode"),
+            )
+            continue
         doc_id = item.get("docID")
         dtype = str(item.get("docTypeCode", ""))
         xbrl_flag = str(item.get("xbrlFlag")) == "1"
