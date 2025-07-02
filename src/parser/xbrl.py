@@ -30,9 +30,25 @@ def extract_facts(xbrl_path: str) -> List[XbrlFact]:
         logger.error("arelle is not installed; cannot parse XBRL")
         return []
 
-    cntlr = Cntlr.Cntlr(unitTest=True)
+    # arelle API as of 2025 no longer supports *unitTest* arg
+    try:
+        cntlr = Cntlr.Cntlr(hasGui=False)
+    except TypeError:
+        # Older arelle: parameter-less ctor
+        cntlr = Cntlr.Cntlr()
+
+    # arelle の内部 logger に必要な属性をセット
+    try:
+        cntlr.startLogging(
+            logFileName="logToBuffer", logLevel="ERROR", logToBuffer=True
+        )  # type: ignore[arg-type]
+    except Exception:  # pragma: no cover – 古い arelle 互換
+        pass
+
     model = ModelManager.initialize(cntlr).load(xbrl_path)
-    model.assertValid()
+    # Some arelle versions don't expose assertValid. Skip if absent.
+    if hasattr(model, "assertValid"):
+        model.assertValid()
 
     facts: List[XbrlFact] = []
     for fact in model.facts:

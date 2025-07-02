@@ -1,6 +1,6 @@
 import os
 from contextlib import contextmanager
-from typing import Iterator, Mapping
+from typing import Iterator, Mapping, Sequence
 from datetime import date, timedelta
 
 from sqlalchemy import create_engine, text
@@ -126,3 +126,77 @@ def upsert_macro_series(record: Mapping[str, object]) -> None:
             conn.execute(sql, record)
         except IntegrityError:
             pass
+
+
+# -------------------------------------------------------------
+# Fact & PDF text helpers
+# -------------------------------------------------------------
+
+
+def upsert_facts(records: Sequence[Mapping[str, object]]) -> None:
+    """Insert or update multiple XBRL facts.
+
+    Each *record* must contain at least the following keys::
+
+        doc_id, item, context, unit, decimals, value
+
+    The table must have a composite primary key (doc_id, item, context, unit).
+    """
+
+    if not records:
+        return
+
+    sql = text(
+        """
+        INSERT INTO facts (
+            doc_id, item, context, unit, decimals, value
+        ) VALUES (
+            :doc_id, :item, :context, :unit, :decimals, :value
+        ) ON CONFLICT (doc_id, item, context, unit)
+          DO UPDATE SET
+            value    = EXCLUDED.value,
+            decimals = EXCLUDED.decimals
+        """
+    )
+
+    with session_scope() as conn:
+        for rec in records:
+            try:
+                conn.execute(sql, rec)
+            except IntegrityError:
+                # Ignore row-level errors to continue processing others
+                pass
+
+
+def upsert_pdf_texts(records: Sequence[Mapping[str, object]]) -> None:
+    """Insert or update extracted PDF page texts.
+
+    Expected columns::
+
+        doc_id, page_no, text, avg_confidence, error_flag, error_type
+    """
+
+    if not records:
+        return
+
+    sql = text(
+        """
+        INSERT INTO pdf_texts (
+            doc_id, page_no, text, avg_confidence, error_flag, error_type
+        ) VALUES (
+            :doc_id, :page_no, :text, :avg_confidence, :error_flag, :error_type
+        ) ON CONFLICT (doc_id, page_no)
+          DO UPDATE SET
+            text           = EXCLUDED.text,
+            avg_confidence = EXCLUDED.avg_confidence,
+            error_flag     = EXCLUDED.error_flag,
+            error_type     = EXCLUDED.error_type
+        """
+    )
+
+    with session_scope() as conn:
+        for rec in records:
+            try:
+                conn.execute(sql, rec)
+            except IntegrityError:
+                pass
