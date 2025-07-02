@@ -44,6 +44,9 @@ def _fetch_list_api(day: date) -> List[dict]:
             data.get("items") if isinstance(data, dict) else data
         )  # API sometimes returns list at top
         results: List[dict] = []
+        # キーワード除外判定用
+        _EXCLUDE_TITLE_KWS = ("投資信託", "運用報告書", "信託", "私募")
+
         for obj in items:
             try:
                 # Yanoshin API v2 (2024-) wraps payload under 'Tdnet' key
@@ -51,12 +54,23 @@ def _fetch_list_api(day: date) -> List[dict]:
                     rec = obj["Tdnet"]
                     filename = rec.get("document_url", "").split("/")[-1]
                     code = rec.get("company_code")
+                    title = rec.get("title")
                 else:
                     filename = (
                         obj.get("filename")
                         or obj.get("document_url", "").split("/")[-1]
                     )
                     code = obj.get("code") or obj.get("security_code")
+                    title = obj.get("title") or obj.get("headline")
+
+                # 会社コードが空（＝投信/私募系）のレコードはスキップ
+                if not code:
+                    continue
+
+                # タイトルに投信系キーワードが含まれる場合はスキップ
+                if title and any(kw in title for kw in _EXCLUDE_TITLE_KWS):
+                    continue
+
                 if filename and filename.lower().endswith(".pdf"):
                     results.append({"code": code, "filename": filename})
             except Exception:  # noqa: BLE001
@@ -105,9 +119,26 @@ def _fetch_list_scrape(day: date) -> List[dict]:
     return results
 
 
-def _download_pdf(filename: str, dest_path: pathlib.Path) -> None:
-    """Download single PDF from TDnet server."""
+def _download_pdf(filename: str, dest_path: pathlib.Path, max_mb: int = 3) -> None:
+    """Download single PDF from TDnet server.
+
+    太さ対策として事前に `HEAD` で Content-Length を確認し、
+    デフォルトで 3 MB 超のファイルはスキップする。
+    """
     url = f"{LIST_BASE_URL}/{filename}"
+
+    try:
+        head = requests.head(url, timeout=10)
+        size_bytes = int(head.headers.get("Content-Length", "0"))
+        if size_bytes > max_mb * 1024 * 1024:
+            logger.info(
+                "Skip %s (%.1f MB > %d MB)", filename, size_bytes / 1048576, max_mb
+            )
+            return
+    except Exception:  # noqa: BLE001
+        # HEAD 失敗時はサイズ不明としてそのまま GET へ進む
+        pass
+
     resp = requests.get(url, stream=True, timeout=300)
     resp.raise_for_status()
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
