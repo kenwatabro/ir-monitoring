@@ -1,0 +1,6 @@
+category: inflation
+prefix: fred
+series:
+  - CPIAUCSL     # Consumer Price Index for All Urban Consumers: All Items
+  - CPILFESL     # CPI: All Items Less Food & Energy (Core CPI)
+  - PCEPILFE     # Personal Consumption Expenditures: Chain-type Price Index (Core PCE) 

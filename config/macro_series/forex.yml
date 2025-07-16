@@ -1,0 +1,5 @@
+category: forex
+prefix: fred
+series:
+  - DEXJPUS      # Japan / U.S. Foreign Exchange Rate
+  - DTWEXBGS     # Trade Weighted U.S. Dollar Index: Broad, Goods 

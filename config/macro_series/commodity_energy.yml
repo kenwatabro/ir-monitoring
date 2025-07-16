@@ -1,0 +1,5 @@
+category: commodity_energy
+prefix: fred
+series:
+  - DCOILWTICO   # Crude Oil Prices: WTI - Cushing, Oklahoma
+  - GOLDAMGBD228NLBM  # Gold Fixing Price 10:30 A.M. (London time) in London Bullion Market, based in U.S. Dollars 

@@ -1,0 +1,6 @@
+category: sentiment
+prefix: fred
+series:
+  - UMCSENT      # University of Michigan: Consumer Sentiment
+  - UMICH        # University of Michigan: All Data Series (headline index)
+  - CONSSENT     # Consumer Sentiment Index 

@@ -1,0 +1,7 @@
+category: gdp_demand
+prefix: fred
+series:
+  - GDP          # Gross Domestic Product (Current Dollars)
+  - GDPC1        # Real Gross Domestic Product
+  - PCE          # Personal Consumption Expenditures
+  - GCE          # Government Consumption Expenditures & Gross Investment 

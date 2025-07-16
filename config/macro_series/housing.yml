@@ -1,0 +1,6 @@
+category: housing
+prefix: fred
+series:
+  - HOUST        # Housing Starts: Total: New Privately-Owned Housing Units Started
+  - CSUSHPINSA   # S&P/Case-Shiller U.S. National Home Price Index
+  - MSPUS        # Median Sales Price for New Houses Sold in the United States 

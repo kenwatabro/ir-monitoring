@@ -1,0 +1,6 @@
+category: employment
+prefix: fred
+series:
+  - UNRATE       # Unemployment Rate
+  - PAYEMS       # All Employees: Total Nonfarm Payrolls
+  - ICSA         # Initial Claims 
