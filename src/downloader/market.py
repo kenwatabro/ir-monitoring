@@ -39,7 +39,12 @@ STOOQ_BASE = "https://stooq.com/q/d/l/"
 def _fetch_stooq(code: str, target_date: date) -> List[Dict[str, object]]:
     """Fetch single-day OHLCV for JP equity code (XXXX.JP)."""
     symbol = f"{code}.JP"
-    params = {"i": "d", "s": symbol.lower()}
+    params = {
+        "i": "d",
+        "s": symbol.lower(),
+        "d1": target_date.strftime("%Y%m%d"),
+        "d2": target_date.strftime("%Y%m%d"),
+    }
     url = f"{STOOQ_BASE}"
     try:
         resp = requests.get(url, params=params, timeout=30)

@@ -62,16 +62,24 @@ class JQuantsCreditDownloader(BaseDownloader):
             return []
 
         try:
-            ymd = target_date.strftime("%Y%m%d")
+            # ------------------------------------------------------------------
+            # J-Quants free plan: only `get_weekly_margin_range` が利用可能。
+            # 指定日のみを投げると 400 が返るケースがあるため、直近 90 日の範囲を
+            # まとめて取得し、`target_date` と一致する行を採用する。
+            # ------------------------------------------------------------------
+
+            import datetime as _dt
+
+            end_dt = target_date.strftime("%Y%m%d")
+            start_dt = (target_date - _dt.timedelta(days=90)).strftime("%Y%m%d")
+
             try:
-                if hasattr(self._client, "get_markets_weekly_margin_interest"):
-                    df = self._client.get_markets_weekly_margin_interest(
-                        date_yyyymmdd=ymd
-                    )
-                else:
-                    raise AttributeError
-            except Exception:  # any error → fallback to range API (free plan)
-                df = self._client.get_weekly_margin_range(start_dt=ymd, end_dt=ymd)
+                df = self._client.get_weekly_margin_range(  # type: ignore[attr-defined]
+                    start_dt=start_dt, end_dt=end_dt
+                )
+            except Exception as exc:
+                logger.exception("J-Quants range API failed: %s", exc)
+                return []
             if df is None or df.empty:  # type: ignore[attr-defined]
                 return []
             results: List[Dict[str, object]] = []
@@ -80,7 +88,14 @@ class JQuantsCreditDownloader(BaseDownloader):
                 if self.codes and code not in self.codes:
                     continue
 
-                ts_date = target_date  # response Date is same as requested
+                # API の返却列 Date (YYYY-MM-DD) を信頼し、対象日判定を行う
+                try:
+                    ts_date = _dt.date.fromisoformat(row["Date"])  # type: ignore[index]
+                except Exception:
+                    ts_date = target_date
+                if ts_date != target_date:
+                    continue  # 期日違いはスキップ
+
                 try:
                     s_vol = float(row["ShortMarginTradeVolume"])
                     l_vol = float(row["LongMarginTradeVolume"])
