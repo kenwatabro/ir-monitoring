@@ -13,9 +13,13 @@ from typing import Dict, List, Optional
 from src import db as db_module
 from src.parser import xbrl as xbrl_parser
 from src.parser import ocr as ocr_parser
+from src.parser.xbrl import FinanceFact
 
 logger = logging.getLogger(__name__)
 logger.setLevel(os.getenv("LOG_LEVEL", "INFO"))
+
+# Feature flag for star-schema migration
+USE_STAR_SCHEMA = os.getenv("USE_STAR_SCHEMA", "false").lower() == "true"
 
 
 class ProcessResult:
@@ -26,6 +30,7 @@ class ProcessResult:
         self.file_path = file_path
         self.doc_id = doc_id
         self.xbrl_facts_count = 0
+        self.finance_facts_count = 0  # Star-schema facts count
         self.pdf_pages_count = 0
         self.error_message: Optional[str] = None
 
@@ -58,10 +63,11 @@ class FileProcessor:
                 result.error_message = f"Unsupported file type: {file_path.suffix}"
 
             self.logger.info(
-                "EDINET file processed: %s (success=%s, xbrl_facts=%d, pdf_pages=%d)",
+                "EDINET file processed: %s (success=%s, xbrl_facts=%d, finance_facts=%d, pdf_pages=%d)",
                 file_path.name,
                 result.success,
                 result.xbrl_facts_count,
+                result.finance_facts_count,
                 result.pdf_pages_count,
             )
 
@@ -131,15 +137,31 @@ class FileProcessor:
             xbrl_file = max(xbrl_files, key=lambda f: f.stat().st_size)
 
             # XBRLファクト抽出
-            facts = self._extract_xbrl_facts(xbrl_file, doc_id)
-            result.xbrl_facts_count = len(facts)
-
-            # データベースに保存
-            if facts:
-                db_module.upsert_facts(facts)
-                self.logger.info(
-                    "Saved %d XBRL facts for doc_id: %s", len(facts), doc_id
+            if USE_STAR_SCHEMA:
+                # 新しいStar-Schema対応API使用
+                finance_facts = self._extract_finance_facts_star_schema(
+                    xbrl_file, doc_id
                 )
+                result.finance_facts_count = len(finance_facts)
+
+                # TODO: 新しいfact_financeテーブルに保存
+                db_module.upsert_finance_facts(doc_id, finance_facts)
+                self.logger.info(
+                    "Extracted %d finance facts (star-schema) for doc_id: %s",
+                    len(finance_facts),
+                    doc_id,
+                )
+            else:
+                # 既存のレガシー処理
+                facts = self._extract_xbrl_facts(xbrl_file, doc_id)
+                result.xbrl_facts_count = len(facts)
+
+                # データベースに保存
+                if facts:
+                    db_module.upsert_facts(facts)
+                    self.logger.info(
+                        "Saved %d XBRL facts for doc_id: %s", len(facts), doc_id
+                    )
 
         return result
 
@@ -231,6 +253,32 @@ class FileProcessor:
         except Exception as e:
             self.logger.exception(
                 "Error extracting XBRL facts from %s: %s", xbrl_path, e
+            )
+            return []
+
+    def _extract_finance_facts_star_schema(
+        self, xbrl_path: pathlib.Path, doc_id: str
+    ) -> List[FinanceFact]:
+        """XBRLファイルからStar-Schema用FinanceFactを抽出
+
+        新しいextract_finance_facts APIを使用してStar-Schema対応の
+        正規化されたFinanceFactオブジェクトを生成する。
+        """
+        try:
+            # 新しいAPIを使用してFinanceFactリストを取得
+            finance_facts = xbrl_parser.extract_finance_facts(str(xbrl_path))
+
+            self.logger.debug(
+                "Extracted %d finance facts from %s using star-schema API",
+                len(finance_facts),
+                xbrl_path,
+            )
+
+            return finance_facts
+
+        except Exception as e:
+            self.logger.exception(
+                "Error extracting finance facts (star-schema) from %s: %s", xbrl_path, e
             )
             return []
 

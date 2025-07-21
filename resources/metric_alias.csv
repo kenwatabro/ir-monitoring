@@ -1,0 +1,16 @@
+tag,metric_id
+NetSales,NET_SALES
+TotalAssets,TOTAL_ASSETS
+TotalLiabilities,TOTAL_LIABILITIES
+NetIncome,NET_INCOME
+OperatingIncome,OPERATING_INCOME
+GrossProfit,GROSS_PROFIT
+RetainedEarnings,RETAINED_EARNINGS
+CashAndCashEquivalents,CASH_AND_EQUIVALENTS
+PropertyPlantAndEquipment,PPE
+Inventories,INVENTORIES
+AccountsReceivable,ACCOUNTS_RECEIVABLE
+AccountsPayable,ACCOUNTS_PAYABLE
+ShortTermBorrowings,SHORT_TERM_DEBT
+LongTermBorrowings,LONG_TERM_DEBT
+ShareCapital,SHARE_CAPITAL 
