@@ -133,6 +133,90 @@ def upsert_macro_series(record: Mapping[str, object]) -> None:
 # -------------------------------------------------------------
 
 
+def _ensure_facts_partition(doc_id: str) -> None:
+    """指定された doc_id 用のパーティションを作成 (存在しなければ)。
+
+    factsテーブルはdoc_idでRANGEパーティション化されている。
+    doc_idの先頭文字に基づいて適切なレンジを設定する。
+    """
+
+    # doc_idの先頭文字を取得
+    prefix = doc_id[0].upper() if doc_id else "A"
+
+    # 先頭文字に基づいてパーティション名とレンジを決定
+    partition_name = f"facts_{prefix}"
+
+    # アルファベット順でレンジを設定
+    range_start = prefix
+    range_end = chr(ord(prefix) + 1)  # 次の文字 (S -> T)
+
+    # パーティション作成SQL
+    create_sql = text(f"""
+        CREATE TABLE IF NOT EXISTS {partition_name} 
+        PARTITION OF facts 
+        FOR VALUES FROM ('{range_start}') TO ('{range_end}')
+    """)
+
+    with session_scope() as conn:
+        try:
+            conn.execute(create_sql)
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.info(
+                f"Created facts partition: {partition_name} for range {range_start}-{range_end}"
+            )
+        except Exception as e:
+            # パーティションが既に存在する場合は無視
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.debug(f"Facts partition creation skipped: {e}")
+            pass
+
+
+def _ensure_pdf_texts_partition(doc_id: str) -> None:
+    """指定された doc_id 用のパーティションを作成 (存在しなければ)。
+
+    pdf_textsテーブルはdoc_idでRANGEパーティション化されている。
+    doc_idの先頭文字に基づいて適切なレンジを設定する。
+    """
+
+    # doc_idの先頭文字を取得
+    prefix = doc_id[0].upper() if doc_id else "A"
+
+    # 先頭文字に基づいてパーティション名とレンジを決定
+    partition_name = f"pdf_texts_{prefix}"
+
+    # アルファベット順でレンジを設定
+    range_start = prefix
+    range_end = chr(ord(prefix) + 1)  # 次の文字 (S -> T)
+
+    # パーティション作成SQL
+    create_sql = text(f"""
+        CREATE TABLE IF NOT EXISTS {partition_name} 
+        PARTITION OF pdf_texts 
+        FOR VALUES FROM ('{range_start}') TO ('{range_end}')
+    """)
+
+    with session_scope() as conn:
+        try:
+            conn.execute(create_sql)
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.info(
+                f"Created pdf_texts partition: {partition_name} for range {range_start}-{range_end}"
+            )
+        except Exception as e:
+            # パーティションが既に存在する場合は無視
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.debug(f"PDF texts partition creation skipped: {e}")
+            pass
+
+
 def upsert_facts(records: Sequence[Mapping[str, object]]) -> None:
     """Insert or update multiple XBRL facts.
 
@@ -145,6 +229,16 @@ def upsert_facts(records: Sequence[Mapping[str, object]]) -> None:
 
     if not records:
         return
+
+    # 必要なパーティションを事前に作成
+    processed_prefixes = set()
+    for rec in records:
+        doc_id = rec.get("doc_id", "")
+        if doc_id:
+            prefix = doc_id[0].upper() if doc_id else "A"
+            if prefix not in processed_prefixes:
+                _ensure_facts_partition(doc_id)
+                processed_prefixes.add(prefix)
 
     sql = text(
         """
@@ -159,12 +253,18 @@ def upsert_facts(records: Sequence[Mapping[str, object]]) -> None:
         """
     )
 
-    with session_scope() as conn:
-        for rec in records:
+    # 各レコードを個別のトランザクションで処理
+    for rec in records:
+        with session_scope() as conn:
             try:
                 conn.execute(sql, rec)
-            except IntegrityError:
-                # Ignore row-level errors to continue processing others
+            except Exception as e:
+                # 全てのエラーをキャッチしてログに記録
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to upsert fact: {rec}, error: {e}")
+                # 処理を継続（他のレコードに影響しないよう）
                 pass
 
 
@@ -178,6 +278,16 @@ def upsert_pdf_texts(records: Sequence[Mapping[str, object]]) -> None:
 
     if not records:
         return
+
+    # 必要なパーティションを事前に作成
+    processed_prefixes = set()
+    for rec in records:
+        doc_id = rec.get("doc_id", "")
+        if doc_id:
+            prefix = doc_id[0].upper() if doc_id else "A"
+            if prefix not in processed_prefixes:
+                _ensure_pdf_texts_partition(doc_id)
+                processed_prefixes.add(prefix)
 
     sql = text(
         """
@@ -194,9 +304,16 @@ def upsert_pdf_texts(records: Sequence[Mapping[str, object]]) -> None:
         """
     )
 
-    with session_scope() as conn:
-        for rec in records:
+    # 各レコードを個別のトランザクションで処理
+    for rec in records:
+        with session_scope() as conn:
             try:
                 conn.execute(sql, rec)
-            except IntegrityError:
+            except Exception as e:
+                # 全てのエラーをキャッチしてログに記録
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to upsert pdf_text: {rec}, error: {e}")
+                # 処理を継続（他のレコードに影響しないよう）
                 pass

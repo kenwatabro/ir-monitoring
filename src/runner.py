@@ -12,6 +12,7 @@ from src import db as db_module
 from src.downloader import edinet, tdnet
 from src.downloader.storage import calc_sha256
 from src.downloader.macro import MacroAggregator
+from src.processor import FileProcessor
 
 load_dotenv()
 
@@ -31,6 +32,9 @@ def run_since(since: date, days: int = 1) -> None:
     run_id = uuid.uuid4()
     AuditLogger.log("INFO", "runner", "start", {"run_id": str(run_id)})
 
+    # Initialize file processor
+    processor = FileProcessor()
+
     for offset in range(days):
         day = since + timedelta(days=offset)
         AuditLogger.log("INFO", "downloader.edinet", "download", {"date": str(day)})
@@ -43,6 +47,11 @@ def run_since(since: date, days: int = 1) -> None:
             day, "EDINET", edinet_results, xbrl_flag=True, pdf_flag=False
         )
         _register_documents(day, "TDnet", tdnet_results, xbrl_flag=False, pdf_flag=True)
+
+        # 🆕 NEW: File processing pipeline
+        AuditLogger.log("INFO", "processor", "start", {"date": str(day)})
+        _process_files(processor, edinet_results, tdnet_results, day)
+        AuditLogger.log("INFO", "processor", "complete", {"date": str(day)})
 
         # Macro series fetch & upsert
         _upsert_macro(day)
@@ -81,6 +90,65 @@ def _register_documents(
             "pdf_flag": pdf_flag,
         }
         db_module.upsert_document(record)
+
+
+def _process_files(
+    processor: FileProcessor,
+    edinet_results: list[pathlib.Path],
+    tdnet_results: list[pathlib.Path],
+    day: date,
+) -> None:
+    """Process downloaded files with FileProcessor."""
+    edinet_success = 0
+    tdnet_success = 0
+    total_xbrl_facts = 0
+    total_pdf_pages = 0
+
+    # Process EDINET files
+    for file_path in edinet_results:
+        try:
+            result = processor.process_edinet_file(file_path)
+            if result.success:
+                edinet_success += 1
+                total_xbrl_facts += result.xbrl_facts_count
+                total_pdf_pages += result.pdf_pages_count
+            else:
+                logger.warning(
+                    "Failed to process EDINET file %s: %s",
+                    file_path,
+                    result.error_message,
+                )
+        except Exception as e:
+            logger.exception("Error processing EDINET file %s: %s", file_path, e)
+
+    # Process TDnet files
+    for file_path in tdnet_results:
+        try:
+            result = processor.process_tdnet_file(file_path)
+            if result.success:
+                tdnet_success += 1
+                total_pdf_pages += result.pdf_pages_count
+            else:
+                logger.warning(
+                    "Failed to process TDnet file %s: %s",
+                    file_path,
+                    result.error_message,
+                )
+        except Exception as e:
+            logger.exception("Error processing TDnet file %s: %s", file_path, e)
+
+    AuditLogger.log(
+        "INFO",
+        "processor",
+        "summary",
+        {
+            "date": str(day),
+            "edinet_processed": edinet_success,
+            "tdnet_processed": tdnet_success,
+            "total_xbrl_facts": total_xbrl_facts,
+            "total_pdf_pages": total_pdf_pages,
+        },
+    )
 
 
 def _upsert_macro(day: date) -> None:
